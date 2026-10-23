@@ -1,4 +1,4 @@
-# approval-service
+# Content Approval API — согласование контента
 
 Backend-сервис согласования контента перед публикацией.
 
@@ -17,10 +17,11 @@ Backend-сервис согласования контента перед пуб
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+По умолчанию используется локальная SQLite-база `approval.db`. При необходимости настройки `DATABASE_URL` и `LOG_LEVEL` можно задать в файле `.env`.
 
 Swagger UI: <http://localhost:8000/docs>
 
