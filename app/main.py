@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
 from fastapi import Depends, FastAPI, Header, Query, Response, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth import Principal, get_principal, require_action
 from app.config import get_settings
-from app.database import Base, engine, get_db
+from app.database import get_db
 from app.models import ApprovalStatus, AuditAction, SourceType
 from app.schemas import (
     ApprovalListResponse,
@@ -23,15 +21,7 @@ from app.service import create_request, decide_request, get_request_or_404, list
 settings = get_settings()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Alembic is the canonical path; this makes local SQLite/demo startup painless.
-    if settings.database_url.startswith("sqlite"):
-        Base.metadata.create_all(bind=engine)
-    yield
-
-
-app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="1.0.0")
 
 
 @app.get("/health")

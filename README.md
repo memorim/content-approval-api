@@ -1,166 +1,44 @@
 # Content Approval API — согласование контента
 
-Backend-сервис согласования контента перед публикацией.
+Хранит заявки на публикацию и решения по ним.
+
+**Тип:** Самостоятельный портфолио-проект. Рабочая демонстрационная реализация; коммерческий запуск и использование реальными пользователями не заявляются.
+
+![CI](https://github.com/memorim/content-approval-api/actions/workflows/ci.yml/badge.svg)
+
+[Пример реального локального запроса и ответа](docs/API_EXAMPLE.md)
+
+## Что работает
+- Создание, чтение, approve/reject/cancel и фильтрация заявок.
+- Идемпотентное создание, журнал аудита и сохранение событий в outbox.
+- Проверка workspace и разрешений, схемы входных данных.
 
 ## Стек
+Python, FastAPI, SQLAlchemy, Alembic, PostgreSQL/SQLite.
 
-- Python 3.12
-- FastAPI
-- SQLAlchemy 2
-- Alembic migrations
-- SQLite для локального запуска или PostgreSQL через Docker Compose
-- Pytest
-
-## Быстрый запуск локально через SQLite
+## Запуск и проверка
+Python 3.12. Для PostgreSQL-варианта — Docker или доступная PostgreSQL.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install -r requirements.txt
 alembic upgrade head
-uvicorn app.main:app --reload
+python -m pytest -q
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-По умолчанию используется локальная SQLite-база `approval.db`. При необходимости настройки `DATABASE_URL` и `LOG_LEVEL` можно задать в файле `.env`.
+## Технические решения
+- Схема базы создаётся через Alembic; запуск приложения не создаёт таблицы в обход миграций.
+- Тестовые соединения закрываются перед удалением временного SQLite-файла.
 
-Swagger UI: <http://localhost:8000/docs>
+## Границы готовности
+- Аутентификация — заглушка на доверенных заголовках; напрямую открывать API недоверенным клиентам нельзя.
+- Запись в outbox реализована, отправителя событий и интеграции с публикацией нет.
+- Права задаются заголовками, полноценный identity-провайдер и проверка JWT не подключены.
 
-## Запуск через Docker Compose
+## Подробности
+[API, конфигурация и исходные инструкции](docs/TECHNICAL.md).
 
-```bash
-docker compose up --build
-```
-
-API будет доступен на <http://localhost:8000>.
-
-## Тесты
-
-```bash
-pytest -q
-```
-
-## Auth-заглушка
-
-Сервис использует заголовки:
-
-```http
-X-Workspace-Id: ws_1
-X-User-Id: usr_1
-X-Actions: approval:read,approval:create,approval:decide,approval:cancel
-```
-
-Права:
-
-| Action | Для чего |
-| --- | --- |
-| `approval:read` | чтение заявок |
-| `approval:create` | создание заявки |
-| `approval:decide` | approve/reject |
-| `approval:cancel` | cancel |
-
-`workspace_id` в URL должен совпадать с `X-Workspace-Id`, иначе сервис вернёт `403`.
-
-## Idempotency
-
-Для создания заявки можно передать заголовок:
-
-```http
-Idempotency-Key: client-request-123
-```
-
-Повторный `POST` с тем же ключом в том же workspace вернёт уже созданную заявку и не создаст дубль.
-Если заголовок не передан, сервис строит детерминированный ключ из workspace, пользователя и тела запроса.
-
-## Примеры запросов
-
-### Health
-
-```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/ready
-```
-
-### Создать заявку
-
-```bash
-curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
-  -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_creator' \
-  -H 'X-Actions: approval:create,approval:read,approval:decide,approval:cancel' \
-  -H 'Idempotency-Key: req-001' \
-  -d '{
-    "sourceType": "publication",
-    "sourceId": "pub_123",
-    "title": "Instagram reel draft",
-    "description": "Needs final approval",
-    "reviewerUserIds": ["usr_1", "usr_2"]
-  }'
-```
-
-### Получить список заявок
-
-```bash
-curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_1' \
-  -H 'X-Actions: approval:read'
-```
-
-Поддерживаются query-параметры:
-
-- `status=pending|approved|rejected|cancelled`
-- `sourceType=publication|scenario|edit|external`
-- `limit=50`
-- `offset=0`
-
-### Получить одну заявку
-
-```bash
-curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id} \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_1' \
-  -H 'X-Actions: approval:read'
-```
-
-### Approve
-
-```bash
-curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/approve \
-  -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_reviewer' \
-  -H 'X-Actions: approval:decide' \
-  -d '{"comment": "Approved"}'
-```
-
-### Reject
-
-```bash
-curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/reject \
-  -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_reviewer' \
-  -H 'X-Actions: approval:decide' \
-  -d '{"reason": "Brand tone is wrong"}'
-```
-
-### Cancel
-
-```bash
-curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/cancel \
-  -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_creator' \
-  -H 'X-Actions: approval:cancel' \
-  -d '{"reason": "Draft was removed"}'
-```
-
-## Гарантии сервиса
-
-- заявки из одного workspace недоступны из другого workspace;
-- повтор создания заявки не создаёт дубль;
-- после финального статуса `approved/rejected/cancelled` заявка не может перейти в другой финальный статус;
-- успешные изменения пишутся в `audit_logs`;
-- будущие интеграционные события сохраняются в `outbox_events`;
-- входные схемы запрещают лишние поля, а payload аудита/событий проходит через redaction чувствительных ключей.
+[Результаты проверки этой версии](docs/VERIFICATION.md).
