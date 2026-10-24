@@ -24,6 +24,25 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.outbox"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/approval
+      OUTBOX_DIRECTORY: /delivery/events
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - approval_delivery:/delivery
+    restart: unless-stopped
 
 volumes:
   approval_pg_data:
+  approval_delivery:

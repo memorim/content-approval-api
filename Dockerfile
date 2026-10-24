@@ -5,8 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-lock.txt ./
+RUN pip install --no-cache-dir -c requirements-lock.txt -r requirements.txt
 
 COPY . .
 
