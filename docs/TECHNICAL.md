@@ -23,7 +23,7 @@ uvicorn app.main:app --reload
 
 По умолчанию используется локальная SQLite-база `approval.db`. При необходимости настройки `DATABASE_URL` и `LOG_LEVEL` можно задать в файле `.env`.
 
-Swagger UI: <http://localhost:8000/docs>
+Swagger UI: `http://localhost:8000/docs`
 
 ## Запуск через Docker Compose
 
@@ -31,7 +31,7 @@ Swagger UI: <http://localhost:8000/docs>
 docker compose up --build
 ```
 
-API будет доступен на <http://localhost:8000>.
+API будет доступен на `http://localhost:8000`.
 
 ## Тесты
 
