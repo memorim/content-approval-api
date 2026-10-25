@@ -18,7 +18,7 @@ Python, FastAPI, SQLAlchemy and Alembic; SQLite locally or PostgreSQL via Docker
 - `app/service.py` changes final status with a conditional SQL UPDATE on the pending state. A stale ORM session cannot overwrite an already finalized decision; only the winning decision produces its audit/outbox event.
 - An Idempotency-Key is validated without truncation. A retry must match the original actor and immutable request fields; using the same key for a different body returns 409.
 - SQLAlchemy transactions commit status, audit and outbox together. Alembic migrations preserve prior records. Lease tokens prevent an old worker from acknowledging a newer delivery lease.
-- Stable event IDs support receiver-side deduplication. Delivery is at-least-once; the receiver must cooperate for effect-level idempotence.
+- Stable event IDs support receiver-side deduplication. A crash after the receiver accepts an event but before acknowledgement can cause duplicate delivery. Automatic retries stop after five claimed attempts; dead events require explicit requeue, so eventual successful delivery is not guaranteed.
 
 ## Local setup
 
@@ -57,7 +57,7 @@ CI installs locked dependencies and runs the configured checks; documentation ch
 ## Limits and next steps
 
 - Identity/action headers are trusted gateway input. The application does not verify a public JWT or authenticate an arbitrary browser user; place it behind a trusted gateway that replaces client-supplied identity headers.
-- SQLite tests exercise deterministic competing sessions; PostgreSQL is configured by Docker Compose but a fresh PostgreSQL concurrency/load run is still needed.
+- PostgreSQL 16 CI uses independent sessions for competing decisions and idempotent creation. These are correctness checks, not a production load benchmark; see the PostgreSQL verification section below.
 - Webhook destinations are operator-controlled configuration, not user-provided URLs. No email, Slack or Telegram integration is implied.
 
 ## Further documentation
