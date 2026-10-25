@@ -1,24 +1,28 @@
-# Content Approval API — согласование контента
+# Content Approval API
 
-Управляет согласованием контента и надёжной передачей событий получателю.
+Review content within a workspace and deliver resulting events with a durable outbox.
 
-**Проект:** Самостоятельная разработка.
 
-![CI](https://github.com/memorim/content-approval-api/actions/workflows/ci.yml/badge.svg)
+## Implemented
 
-[Пример реального локального запроса и ответа](docs/API_EXAMPLE.md)
+- Create, approve, reject and cancel requests; filtering and audit history.
+- Idempotent creation and transactional business changes plus outbox events.
+- Leased outbox delivery, retries, dead letters and an idempotent local receiver or configured HTTPS destination.
 
-## Что работает
-- Создание, approve/reject/cancel, фильтрация и журнал аудита.
-- Идемпотентные запросы и outbox в транзакции бизнес-операции.
-- Worker с арендой события, повторными попытками, dead letter и ручным перезапуском.
-- Локальный получатель с дедупликацией либо настроенный HTTPS webhook.
+## Stack and architecture
 
-## Стек
-Python, FastAPI, SQLAlchemy, Alembic, PostgreSQL/SQLite.
+Python, FastAPI, SQLAlchemy and Alembic; SQLite locally or PostgreSQL via Docker Compose.
 
-## Запуск и проверка
-Python 3.12.14.
+## Technical mechanisms and security
+
+- `app/service.py` changes final status with a conditional SQL UPDATE on the pending state. A stale ORM session cannot overwrite an already finalized decision; only the winning decision produces its audit/outbox event.
+- An Idempotency-Key is validated without truncation. A retry must match the original actor and immutable request fields; using the same key for a different body returns 409.
+- SQLAlchemy transactions commit status, audit and outbox together. Alembic migrations preserve prior records. Lease tokens prevent an old worker from acknowledging a newer delivery lease.
+- Stable event IDs support receiver-side deduplication. Delivery is at-least-once; the receiver must cooperate for effect-level idempotence.
+
+## Local setup
+
+Python 3.12.14 (see `.python-version`). Activate the virtual environment before the remaining commands.
 
 ```bash
 python -m venv .venv
@@ -26,21 +30,38 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 python -m pip install -c requirements-lock.txt -r requirements.txt
 alembic upgrade head
-python -m pytest -q
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Технические решения
-- Схема изменяется через Alembic, включая проверку обновления предыдущего релиза.
-- Lease token защищает подтверждение от устаревшего worker.
-- Stable event_id и Idempotency-Key позволяют получателю безопасно принимать повторную доставку.
+## Configuration
 
-## Подробности
-[API, конфигурация и исходные инструкции](docs/TECHNICAL.md).
+Use [.env.example](.env.example) for supported configuration and keep secrets outside Git. See [configuration details](docs/TECHNICAL.md) for loading settings and optional services.
 
-[Результаты проверки этой версии](docs/VERIFICATION.md).
+## Database and upgrades
 
-## Проверки и обновления
-CI проверяет проект и ссылки на локальные материалы. Dependabot предлагает обновления зависимостей и Actions. [История изменений](CHANGELOG.md).
+Run the migration command above before serving requests. Existing records are retained; tests check upgrading an immutable earlier version.
 
-[Контракты API и обновление базы](docs/COMPATIBILITY.md): `python tests/check_contract.py && python tests/check_upgrade.py`.
+## Verification
+
+```bash
+python -m pytest -q
+python tests/check_contract.py
+python tests/check_upgrade.py
+python -m pip check
+```
+
+`tests/test_audit.py` checks stale-session decisions and conflicting idempotent retries. The existing outbox suite covers leases, retry/dead-letter handling and receiver deduplication.
+
+CI installs locked dependencies and runs the configured checks; documentation checks also validate local links/images. Python dependency auditing uses `pip-audit --disable-pip --no-deps --strict -r requirements-lock.txt`. A passing scanner only reports known advisories at the time of the run.
+
+## Limits and next steps
+
+- Identity/action headers are trusted gateway input. The application does not verify a public JWT or authenticate an arbitrary browser user; place it behind a trusted gateway that replaces client-supplied identity headers.
+- SQLite tests exercise deterministic competing sessions; PostgreSQL is configured by Docker Compose but a fresh PostgreSQL concurrency/load run is still needed.
+- Webhook destinations are operator-controlled configuration, not user-provided URLs. No email, Slack or Telegram integration is implied.
+
+## Further documentation
+
+[Audit findings and follow-up](docs/AUDIT_2026_10.md) · [Technical reference](docs/TECHNICAL.md) · [Change history](CHANGELOG.md)
+
+[API request/response example](docs/API_EXAMPLE.md)

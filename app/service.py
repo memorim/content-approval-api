@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -29,8 +29,10 @@ def normalize_body_for_hash(body: Any) -> str:
 
 
 def build_idempotency_key(workspace_id: str, user_id: str, payload: CreateApprovalRequest, header_key: str | None) -> str:
-    if header_key:
-        return header_key[:128]
+    if header_key is not None:
+        if not 1 <= len(header_key) <= 128:
+            raise HTTPException(status_code=400, detail="Idempotency-Key must contain 1 to 128 characters")
+        return header_key
     raw = normalize_body_for_hash(payload.model_dump(mode="json", by_alias=True))
     return hashlib.sha256(f"{workspace_id}:{user_id}:{raw}".encode("utf-8")).hexdigest()
 
@@ -90,6 +92,16 @@ def add_audit_and_event(
     )
 
 
+def replay_or_conflict(existing, payload, actor_user_id):
+    expected = (payload.source_type, payload.source_id, payload.title, payload.description,
+                frozenset(payload.reviewer_user_ids))
+    actual = (existing.source_type, existing.source_id, existing.title, existing.description,
+              frozenset(r.reviewer_user_id for r in existing.reviewers))
+    if existing.created_by != actor_user_id or actual != expected:
+        raise HTTPException(status_code=409, detail="Idempotency-Key already used for another request")
+    return existing
+
+
 def create_request(
     db: Session,
     *,
@@ -105,7 +117,7 @@ def create_request(
         .options(selectinload(ApprovalRequest.reviewers))
     )
     if existing:
-        return existing
+        return replay_or_conflict(existing, payload, actor_user_id)
 
     reviewer_ids = list(dict.fromkeys(payload.reviewer_user_ids))
     request = ApprovalRequest(
@@ -130,7 +142,7 @@ def create_request(
             .options(selectinload(ApprovalRequest.reviewers))
         )
         if existing:
-            return existing
+            return replay_or_conflict(existing, payload, actor_user_id)
         raise
 
     add_audit_and_event(
@@ -205,12 +217,19 @@ def decide_request(
         )
 
     before = request.status
-    request.status = target_status
-    request.decided_by = actor_user_id
-    request.decided_at = utcnow()
-    request.updated_at = utcnow()
-    request.decision_comment = comment
-    request.decision_reason = reason
+    now = utcnow()
+    changed = db.execute(
+        update(ApprovalRequest).where(
+            ApprovalRequest.id == request_id,
+            ApprovalRequest.workspace_id == workspace_id,
+            ApprovalRequest.status == ApprovalStatus.pending,
+        ).values(status=target_status, decided_by=actor_user_id, decided_at=now,
+                 updated_at=now, decision_comment=comment, decision_reason=reason)
+    )
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Request already has a final status")
+    db.refresh(request)
 
     payload: dict[str, Any] = {}
     if comment is not None:
