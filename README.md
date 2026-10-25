@@ -65,3 +65,7 @@ CI installs locked dependencies and runs the configured checks; documentation ch
 [Audit findings and follow-up](docs/AUDIT_2026_10.md) · [Technical reference](docs/TECHNICAL.md) · [Change history](CHANGELOG.md)
 
 [API request/response example](docs/API_EXAMPLE.md)
+
+## PostgreSQL verification
+
+See [PostgreSQL concurrency checks](docs/POSTGRES_CONCURRENCY.md) for isolated test setup, CI and the exact concurrency guarantees.
