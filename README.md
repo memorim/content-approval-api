@@ -1,28 +1,29 @@
-# Content Approval API
+# Content Approval API — согласование контента
 
-Review content within a workspace and deliver resulting events with a durable outbox.
+Согласование заявок внутри рабочего пространства и надёжное хранение событий для последующей доставки.
 
 
-## Implemented
 
-- Create, approve, reject and cancel requests; filtering and audit history.
-- Idempotent creation and transactional business changes plus outbox events.
-- Leased outbox delivery, retries, dead letters and an idempotent local receiver or configured HTTPS destination.
+## Возможности
 
-## Stack and architecture
+- Создание, одобрение, отклонение и отмена заявок, фильтры и аудит.
+- Идемпотентное создание и атомарное сохранение решения с outbox-событием.
+- Аренда событий, ограниченные повторы, очередь исчерпанных попыток и получатель с дедупликацией.
 
-Python, FastAPI, SQLAlchemy and Alembic; SQLite locally or PostgreSQL via Docker Compose.
+## Стек и устройство
 
-## Technical mechanisms and security
+Python, FastAPI, SQLAlchemy, Alembic; SQLite локально, PostgreSQL через Docker Compose.
 
-- `app/service.py` changes final status with a conditional SQL UPDATE on the pending state. A stale ORM session cannot overwrite an already finalized decision; only the winning decision produces its audit/outbox event.
-- An Idempotency-Key is validated without truncation. A retry must match the original actor and immutable request fields; using the same key for a different body returns 409.
-- SQLAlchemy transactions commit status, audit and outbox together. Alembic migrations preserve prior records. Lease tokens prevent an old worker from acknowledging a newer delivery lease.
-- Stable event IDs support receiver-side deduplication. A crash after the receiver accepts an event but before acknowledgement can cause duplicate delivery. Automatic retries stop after five claimed attempts; dead events require explicit requeue, so eventual successful delivery is not guaranteed.
+## Ключевые решения
 
-## Local setup
+- `app/service.py` меняет финальный статус условным UPDATE только из pending. Устаревшая ORM-сессия не может перезаписать итог; аудит и событие создаёт только победившая операция.
+- Idempotency-Key проверяется без обрезки; повтор должен совпадать по участнику и неизменяемым полям, иначе 409.
+- Статус, аудит и outbox фиксируются одной транзакцией. Миграции Alembic сохраняют записи; токен аренды запрещает старому исполнителю подтвердить новую доставку.
+- Стабильный ID события позволяет получателю исключать дубли. Сбой между приёмом и подтверждением может вызвать повтор; после пяти попыток требуется явная постановка в очередь.
 
-Python 3.12.14 (see `.python-version`). Activate the virtual environment before the remaining commands.
+## Локальный запуск
+
+Python 3.12.14, как в `.python-version`. Перед установкой зависимостей активируйте виртуальное окружение.
 
 ```bash
 python -m venv .venv
@@ -33,15 +34,17 @@ alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Configuration
+Команда запуска привязывает API к локальному адресу 127.0.0.1.
 
-Use [.env.example](.env.example) for supported configuration and keep secrets outside Git. See [configuration details](docs/TECHNICAL.md) for loading settings and optional services.
+## Настройки
 
-## Database and upgrades
+Доступные параметры перечислены в [.env.example](.env.example). Секреты храните вне Git. Порядок загрузки настроек и необязательные службы описаны в [технической документации](docs/TECHNICAL.md).
 
-Run the migration command above before serving requests. Existing records are retained; tests check upgrading an immutable earlier version.
+## Данные и обновления
 
-## Verification
+Выполните команду миграции из инструкции перед запуском API. Существующие записи сохраняются; тесты проверяют обновление зафиксированной предыдущей версии.
+
+## Проверки
 
 ```bash
 python -m pytest -q
@@ -50,22 +53,16 @@ python tests/check_upgrade.py
 python -m pip check
 ```
 
-`tests/test_audit.py` checks stale-session decisions and conflicting idempotent retries. The existing outbox suite covers leases, retry/dead-letter handling and receiver deduplication.
+Проверяются решения из устаревших сессий, идемпотентность, аренды, повторная доставка и дедупликация. CI PostgreSQL проверяет конкурирующие решения и равные/конфликтующие ключи.
 
-CI installs locked dependencies and runs the configured checks; documentation checks also validate local links/images. Python dependency auditing uses `pip-audit --disable-pip --no-deps --strict -r requirements-lock.txt`. A passing scanner only reports known advisories at the time of the run.
+CI устанавливает зависимости по зафиксированным версиям и запускает настроенные проверки. Отдельная проверка документации находит неверные локальные ссылки и изображения. Проверка уязвимостей учитывает известные проблемы на момент запуска.
 
-## Limits and next steps
+## Ограничения
 
-- Identity/action headers are trusted gateway input. The application does not verify a public JWT or authenticate an arbitrary browser user; place it behind a trusted gateway that replaces client-supplied identity headers.
-- PostgreSQL 16 CI uses independent sessions for competing decisions and idempotent creation. These are correctness checks, not a production load benchmark; see the PostgreSQL verification section below.
-- Webhook destinations are operator-controlled configuration, not user-provided URLs. No email, Slack or Telegram integration is implied.
+- Заголовки личности и действия считаются доверенным вводом шлюза. Публичные JWT и произвольные пользователи не аутентифицируются; нужен шлюз, заменяющий клиентские identity-заголовки.
+- Проверки PostgreSQL используют независимые сессии; это проверки корректности, а не подтверждение производственной нагрузки.
+- Адрес webhook задаёт оператор. Интеграции с почтой, Slack и Telegram не подключены. Успешная доставка после исчерпания попыток не гарантирована.
 
-## Further documentation
+## Документация
 
-[Audit findings and follow-up](docs/AUDIT_2026_10.md) · [Technical reference](docs/TECHNICAL.md) · [Change history](CHANGELOG.md)
-
-[API request/response example](docs/API_EXAMPLE.md)
-
-## PostgreSQL verification
-
-See [PostgreSQL concurrency checks](docs/POSTGRES_CONCURRENCY.md) for isolated test setup, CI and the exact concurrency guarantees.
+[Результаты аудита](docs/AUDIT_2026_10.md) · [Техническая документация](docs/TECHNICAL.md) · [Пример запроса и ответа](docs/API_EXAMPLE.md) · [Конкурентные проверки PostgreSQL](docs/POSTGRES_CONCURRENCY.md) · [История изменений](CHANGELOG.md)
