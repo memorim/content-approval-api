@@ -6,8 +6,15 @@ async function call(path, method = "GET", body) {
   const headers = {
     "Content-Type": "application/json",
     "X-User-Id": document.querySelector("#actor")?.value || "author",
+    "X-Workspace-Id": "demo",
+    "X-Actions":
+      "approval:create,approval:approve,approval:reject,approval:cancel",
   };
-  const response = await fetch(path, {
+  const endpoint = path.replace(
+    "/api/approval-requests",
+    "/api/v1/workspaces/demo/approval-requests",
+  );
+  const response = await fetch(endpoint, {
     method,
     headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -102,6 +109,9 @@ document.querySelector("#editor").onsubmit = async (event) => {
   const form = event.currentTarget;
   try {
     await call("/api/approval-requests", "POST", {
+      sourceType: "publication",
+      sourceId: crypto.randomUUID(),
+      reviewerUserIds: ["reviewer"],
       title: form.elements.title.value,
       description: form.elements.description.value,
     });

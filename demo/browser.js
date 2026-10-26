@@ -45,6 +45,7 @@
   };
   globalThis.PORTFOLIO_DEMO = true;
   async function handle(url, method, body, headers) {
+    url.pathname = url.pathname.replace("/api/v1/workspaces/demo/", "/api/");
     const rows = state["/api/approval-requests"],
       actor = headers.get("X-User-Id") || "author";
     if (url.pathname === "/api/approval-requests" && method === "GET")
