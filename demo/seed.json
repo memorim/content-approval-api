@@ -1,0 +1,13 @@
+{
+  "/api/approval-requests": [
+    {
+      "id": "sample",
+      "title": "Публикация нового материала",
+      "description": "Проверьте текст перед публикацией.",
+      "status": "pending",
+      "createdBy": "author",
+      "reviewerUserIds": ["reviewer"]
+    }
+  ],
+  "events": []
+}

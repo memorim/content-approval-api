@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Согласование контента</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Content Approval API</strong
+      ><a href="https://github.com/memorim/content-approval-api"
+        >Исходный код ↗</a
+      >
+    </header>
+    <main>
+      <div class="intro">
+        <span class="eyebrow">API / INTERACTIVE WORKSPACE</span>
+        <h1>Согласование контента</h1>
+        <p>
+          Создайте заявку и примите решение от имени рецензента. Посмотрите
+          изменение статуса, события и ответы на повторные действия.
+        </p>
+      </div>
+      <div class="layout">
+        <section>
+          <div class="panel">
+            <h2>Новая запись</h2>
+            <form id="editor">
+              <label
+                >Заголовок<input
+                  name="title"
+                  required
+                  maxlength="512"
+                  placeholder="Материал для согласования" /></label
+              ><label
+                >Описание<textarea
+                  name="description"
+                  maxlength="2000"
+                  rows="3"
+                ></textarea></label
+              ><label
+                >Участник сессии<select id="actor">
+                  <option value="author">Автор</option>
+                  <option value="reviewer">Рецензент</option>
+                </select></label
+              ><button>Создать заявку</button>
+            </form>
+            <p id="feedback" role="status"></p>
+          </div>
+          <div id="records"></div>
+        </section>
+        <aside>
+          <section class="panel response">
+            <h2>Запрос и ответ</h2>
+            <pre id="request">Выберите действие</pre>
+            <pre id="response"></pre>
+          </section>
+          <section class="panel">
+            <h2>История сессии</h2>
+            <div id="history"></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+    <footer>
+      Действия выполняются в памяти текущей вкладки. Аутентификация, база данных
+      и серверные гарантии проверяются при локальном запуске - инструкция в
+      репозитории.
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>
