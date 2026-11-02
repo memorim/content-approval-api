@@ -35,9 +35,9 @@ def test_stale_decision_cannot_overwrite_an_already_committed_final_status(tmp_p
 
 def test_same_idempotency_key_rejects_a_different_request_or_actor(client):
     path='/api/v1/workspaces/w/approval-requests'
-    headers={'X-Workspace-Id':'w','X-User-Id':'u','X-Actions':'approval:create','Idempotency-Key':'shared'}
+    headers={'Authorization':'Bearer audit'+'-'*40,'X-Workspace-Id':'w','X-User-Id':'u','X-Actions':'approval:create','Idempotency-Key':'shared'}
     body={'sourceType':'publication','sourceId':'s','title':'Original','reviewerUserIds':['r']}
     assert client.post(path,headers=headers,json=body).status_code == 201
     assert client.post(path,headers=headers,json=body | {'title':'Changed'}).status_code == 409
-    assert client.post(path,headers=headers | {'X-User-Id':'another'},json=body).status_code == 409
+    assert client.post(path,headers=headers | {'Authorization':'Bearer another'+'-'*40},json=body).status_code == 409
     assert client.post(path,headers=headers | {'Idempotency-Key':'x'*129},json=body).status_code == 400

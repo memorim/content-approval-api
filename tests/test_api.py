@@ -4,6 +4,7 @@ from app.database import get_db
 
 BASE = "/api/v1/workspaces/ws_1/approval-requests"
 HEADERS_ALL = {
+    "Authorization": "Bearer creator" + "-" * 40,
     "X-Workspace-Id": "ws_1",
     "X-User-Id": "usr_creator",
     "X-Actions": "approval:read,approval:create,approval:decide,approval:cancel",
@@ -64,6 +65,7 @@ def test_workspace_isolation(client):
     request_id = create.json()["id"]
 
     other_workspace_headers = {
+        "Authorization": "Bearer other" + "-" * 40,
         "X-Workspace-Id": "ws_2",
         "X-User-Id": "usr_other",
         "X-Actions": "approval:read",
@@ -85,6 +87,7 @@ def test_final_status_cannot_change(client):
 
 def test_permissions_are_required(client):
     no_create_headers = {
+        "Authorization": "Bearer reader" + "-" * 40,
         "X-Workspace-Id": "ws_1",
         "X-User-Id": "usr_1",
         "X-Actions": "approval:read",
@@ -107,3 +110,17 @@ def test_each_change_creates_audit_and_outbox_event(client):
         db.close()
     assert audit_count == 2
     assert event_count == 2
+
+
+def test_identity_and_grants_cannot_be_spoofed(client):
+    assert client.get(BASE, headers={"X-Workspace-Id":"ws_1", "X-User-Id":"usr_creator", "X-Actions":"approval:read"}).status_code == 401
+    assert client.get(BASE, headers={"Authorization":"Bearer " + "x" * 40}).status_code == 401
+    spoofed = HEADERS_ALL | {"Authorization":"Bearer other" + "-" * 40}
+    assert client.get(BASE, headers=spoofed).status_code == 403
+    spoofed["Authorization"] = "Bearer reader" + "-" * 40
+    assert client.post(BASE, headers=spoofed, json=payload()).status_code == 403
+
+
+def test_misconfigured_registry_fails_closed(client, monkeypatch):
+    monkeypatch.setenv("APP_AUTH_TOKENS", "not-json")
+    assert client.get(BASE, headers=HEADERS_ALL).status_code == 503

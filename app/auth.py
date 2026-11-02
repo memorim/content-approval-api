@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
+import os
 from fastapi import Header, HTTPException, Path, status
 
 
@@ -15,14 +18,29 @@ def parse_actions(header: str) -> frozenset[str]:
     return frozenset(action.strip() for action in header.split(",") if action.strip())
 
 
-def get_principal(
-    x_workspace_id: str = Header(..., alias="X-Workspace-Id"),
-    x_user_id: str = Header(..., alias="X-User-Id"),
-    x_actions: str = Header("", alias="X-Actions"),
-) -> Principal:
-    if not x_workspace_id or not x_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing auth headers")
-    return Principal(workspace_id=x_workspace_id, user_id=x_user_id, actions=parse_actions(x_actions))
+def get_principal(authorization: str | None = Header(None, alias="Authorization")) -> Principal:
+    # Only operator-configured hashes bind a credential to its identity and grants.
+    # Incoming X-User-Id/X-Workspace-Id/X-Actions have no authority.
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Bearer credential required")
+    token = authorization[7:]
+    if len(token) < 32 or len(token) > 256:
+        raise HTTPException(status_code=401, detail="Invalid credential")
+    try:
+        registry = json.loads(os.getenv("APP_AUTH_TOKENS", "{}"))
+        if not isinstance(registry, dict):
+            raise ValueError("Invalid registry")
+        entry = registry.get(hashlib.sha256(token.encode()).hexdigest())
+        if entry is None:
+            raise HTTPException(status_code=401, detail="Invalid credential")
+        if (not isinstance(entry, dict) or not isinstance(entry.get("workspace_id"), str)
+                or not entry["workspace_id"] or not isinstance(entry.get("user_id"), str)
+                or not entry["user_id"] or not isinstance(entry.get("actions"), list)
+                or not all(isinstance(action, str) for action in entry["actions"])):
+            raise ValueError("Invalid principal configuration")
+        return Principal(entry["workspace_id"], entry["user_id"], frozenset(entry["actions"]))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=503, detail="Authentication unavailable") from None
 
 
 def authorize_workspace(

@@ -403,30 +403,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -484,30 +472,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -570,30 +546,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -646,30 +610,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -732,30 +684,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],
@@ -818,30 +758,18 @@
           },
           {
             "in": "header",
-            "name": "X-Workspace-Id",
-            "required": true,
-            "schema": {
-              "title": "X-Workspace-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-User-Id",
-            "required": true,
-            "schema": {
-              "title": "X-User-Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actions",
+            "name": "Authorization",
             "required": false,
             "schema": {
-              "default": "",
-              "title": "X-Actions",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],

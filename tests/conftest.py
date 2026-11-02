@@ -1,4 +1,6 @@
 import tempfile
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -11,7 +13,18 @@ from app.main import app
 
 
 @pytest.fixture()
-def client():
+def client(monkeypatch):
+    identities = {
+        "creator": ("ws_1", "usr_creator", ["approval:read", "approval:create", "approval:decide", "approval:cancel"]),
+        "other": ("ws_2", "usr_other", ["approval:read"]),
+        "reader": ("ws_1", "usr_1", ["approval:read"]),
+        "audit": ("w", "u", ["approval:create"]),
+        "another": ("w", "another", ["approval:create"]),
+    }
+    registry = {hashlib.sha256((name + "-" * 40).encode()).hexdigest():
+                {"workspace_id": workspace, "user_id": user, "actions": actions}
+                for name, (workspace, user, actions) in identities.items()}
+    monkeypatch.setenv("APP_AUTH_TOKENS", json.dumps(registry))
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
