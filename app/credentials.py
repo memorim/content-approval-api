@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import secrets
 import sqlite3
 import time
@@ -14,6 +15,8 @@ from pathlib import Path
 def connect(path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+    os.close(fd)
     db = sqlite3.connect(path)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
@@ -63,7 +66,8 @@ def issue(path, workspace, user_id, actions, days=30):
 
 
 def lookup(path, token):
-    db = connect(path)
+    db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+    db.row_factory = sqlite3.Row
     try:
         row = db.execute(
             """SELECT t.* FROM auth_tokens t JOIN auth_users u
@@ -95,6 +99,34 @@ def revoke(path, digest):
         db.close()
 
 
+def set_user_active(path, workspace, user_id, active):
+    db = connect(path)
+    try:
+        with db:
+            changed = db.execute(
+                "UPDATE auth_users SET active=? WHERE workspace=? AND user_id=?",
+                (int(active), workspace, user_id),
+            ).rowcount
+            if changed and not active:
+                db.execute(
+                    "UPDATE auth_tokens SET revoked=1 WHERE workspace=? AND user_id=?",
+                    (workspace, user_id),
+                )
+            return changed
+    finally:
+        db.close()
+
+
+def list_users(path):
+    db = connect(path)
+    try:
+        return [dict(row) for row in db.execute(
+            "SELECT workspace,user_id,active FROM auth_users ORDER BY workspace,user_id"
+        )]
+    finally:
+        db.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True)
@@ -106,14 +138,25 @@ def main():
     add.add_argument("--days", type=int, default=30)
     delete = sub.add_parser("revoke")
     delete.add_argument("hash")
+    sub.add_parser("users")
+    for command in ["disable-user", "enable-user"]:
+        user = sub.add_parser(command)
+        user.add_argument("--workspace", required=True)
+        user.add_argument("--user", required=True)
     args = parser.parse_args()
     if args.command == "issue":
         token, digest = issue(
             args.database, args.workspace, args.user, args.actions.split(","), args.days
         )
         print(json.dumps({"token": token, "token_hash": digest}))
-    else:
+    elif args.command == "revoke":
         print(json.dumps({"revoked": revoke(args.database, args.hash)}))
+    elif args.command == "users":
+        print(json.dumps({"users": list_users(args.database)}))
+    else:
+        print(json.dumps({"changed": set_user_active(
+            args.database, args.workspace, args.user, args.command == "enable-user"
+        )}))
 
 
 if __name__ == "__main__":

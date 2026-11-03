@@ -90,3 +90,7 @@ API требует `Authorization: Bearer <token>`. Заголовки X-User-Id
 ### Пользователи и отзыв доступа
 
 Задайте APP_AUTH_DATABASE=/secure/auth.sqlite3. Выпуск: `python -m app.credentials --database /secure/auth.sqlite3 issue --workspace ws_1 --user usr_1 --actions approval:read,approval:create --days 30`. Команда показывает секрет один раз; в БД хранится только SHA-256. Передайте его пользователю по защищённому каналу. Отзыв: `python -m app.credentials --database /secure/auth.sqlite3 revoke TOKEN_HASH`. Отзыв применяется ко всем процессам при следующем запросе без перезапуска. У токенов есть срок действия; файлы создаются с правами 0600. Старый APP_AUTH_TOKENS поддерживается, если APP_AUTH_DATABASE не задан.
+
+### Управление пользователями
+
+`python -m app.credentials --database /secure/auth.db users` выводит пользователей и их статус. Команды `disable-user --workspace WS --user USER` и `enable-user --workspace WS --user USER` отключают и включают пользователя. Отключение одной транзакцией отзывает все его токены только в указанном workspace. Повторное включение не восстанавливает старые токены: выдайте новый через `issue`. Проверка токена читает существующую БД в read-only режиме и не создаёт пустую базу при ошибке пути. Секрет нового токена выдаётся только при создании; не сохраняйте вывод команды в общие журналы.
