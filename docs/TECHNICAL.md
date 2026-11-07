@@ -16,7 +16,7 @@ Backend-сервис согласования контента перед пуб
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -c requirements-lock.txt -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -39,15 +39,21 @@ API будет доступен на `http://localhost:8000`.
 pytest -q
 ```
 
-## Auth-заглушка
+## Серверная авторизация
 
-Сервис использует заголовки:
+API проверяет `Authorization: Bearer <token>`. Заголовки `X-Workspace-Id`, `X-User-Id` и `X-Actions` не задают личность или права. `workspace_id` в URL должен совпадать с пространством, связанным с токеном, иначе ответ — `403`. Без настроенного реестра запрос закрыт (`401`); при недоступной БД авторизации — `503`.
 
-```http
-X-Workspace-Id: ws_1
-X-User-Id: usr_1
-X-Actions: approval:read,approval:create,approval:decide,approval:cancel
+Для локального запуска оператор создаёт отдельные токены:
+
+```bash
+export APP_AUTH_DATABASE=/secure/auth.db
+python -m app.credentials --database "$APP_AUTH_DATABASE" issue --workspace ws_1 --user usr_creator --actions approval:create,approval:read,approval:cancel
+python -m app.credentials --database "$APP_AUTH_DATABASE" issue --workspace ws_1 --user usr_reviewer --actions approval:read,approval:decide
 ```
+
+Команда показывает секрет один раз. В реестре хранится SHA-256, срок по умолчанию — 30 дней. Передайте каждому участнику только его токен через защищённый канал. Для примеров ниже задайте `CREATOR_TOKEN` и `REVIEWER_TOKEN` в своей оболочке, не сохраняя их в Git или общих журналах. На опубликованном сервере используйте HTTPS.
+
+`revoke HASH` отзывает токен, `disable-user --workspace WS --user USER` отключает пользователя и отзывает его токены в этом пространстве. Повторное включение не восстанавливает отозванные токены. Все процессы должны читать одну постоянную БД авторизации. Альтернативный `APP_AUTH_TOKENS` и порядок выбора реестра описаны в [README](../README.md#серверная-идентификация).
 
 Права:
 
@@ -58,7 +64,7 @@ X-Actions: approval:read,approval:create,approval:decide,approval:cancel
 | `approval:decide` | approve/reject |
 | `approval:cancel` | cancel |
 
-`workspace_id` в URL должен совпадать с `X-Workspace-Id`, иначе сервис вернёт `403`.
+Права берутся из серверного реестра, а не из запроса клиента.
 
 ## Idempotency
 
@@ -85,9 +91,7 @@ curl http://localhost:8000/ready
 ```bash
 curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
   -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_creator' \
-  -H 'X-Actions: approval:create,approval:read,approval:decide,approval:cancel' \
+  -H "Authorization: Bearer $CREATOR_TOKEN" \
   -H 'Idempotency-Key: req-001' \
   -d '{
     "sourceType": "publication",
@@ -102,9 +106,7 @@ curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
 
 ```bash
 curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_1' \
-  -H 'X-Actions: approval:read'
+  -H "Authorization: Bearer $REVIEWER_TOKEN"
 ```
 
 Поддерживаются query-параметры:
@@ -118,9 +120,7 @@ curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests \
 
 ```bash
 curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id} \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_1' \
-  -H 'X-Actions: approval:read'
+  -H "Authorization: Bearer $REVIEWER_TOKEN"
 ```
 
 ### Approve
@@ -128,9 +128,7 @@ curl http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}
 ```bash
 curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/approve \
   -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_reviewer' \
-  -H 'X-Actions: approval:decide' \
+  -H "Authorization: Bearer $REVIEWER_TOKEN" \
   -d '{"comment": "Approved"}'
 ```
 
@@ -139,9 +137,7 @@ curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{req
 ```bash
 curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/reject \
   -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_reviewer' \
-  -H 'X-Actions: approval:decide' \
+  -H "Authorization: Bearer $REVIEWER_TOKEN" \
   -d '{"reason": "Brand tone is wrong"}'
 ```
 
@@ -150,9 +146,7 @@ curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{req
 ```bash
 curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{request_id}/cancel \
   -H 'Content-Type: application/json' \
-  -H 'X-Workspace-Id: ws_1' \
-  -H 'X-User-Id: usr_creator' \
-  -H 'X-Actions: approval:cancel' \
+  -H "Authorization: Bearer $CREATOR_TOKEN" \
   -d '{"reason": "Draft was removed"}'
 ```
 
@@ -166,4 +160,4 @@ curl -X POST http://localhost:8000/api/v1/workspaces/ws_1/approval-requests/{req
 - входные схемы запрещают лишние поля, а payload аудита/событий проходит через redaction чувствительных ключей.
 
 ## Текущий режим работы
-Идентичность и роли передаются доверенными заголовками: сервис предполагает внешний шлюз аутентификации. Outbox worker доставляет событие в локальный каталог либо настроенный HTTPS webhook. Внешний получатель должен дедуплицировать event_id; публикация в конкретной соцсети — отдельная интеграция. См. [Outbox](OUTBOX.md).
+Идентичность и роли задаёт серверный реестр Bearer-токенов; самостоятельная регистрация и OIDC не подключены. Outbox worker доставляет событие в локальный каталог, фиксированный HTTPS webhook либо ntfy. Внешний получатель должен дедуплицировать event_id; публикация в конкретной соцсети — отдельная интеграция. См. [Outbox](OUTBOX.md) и [бесплатные уведомления](FREE_NOTIFICATIONS.md).
