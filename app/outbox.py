@@ -130,6 +130,29 @@ def webhook_receiver(url, client, token=""):
     return send
 
 
+def ntfy_receiver(topic, client):
+    import re
+
+    if not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", topic):
+        raise ValueError("Use a random ntfy topic of 32–128 safe characters")
+
+    def send(event):
+        # Free topics are unlisted, not authenticated private storage. No request payload.
+        response = client.post(
+            "https://ntfy.sh/",
+            json={
+                "topic": topic,
+                "title": "Content Approval",
+                "message": "Approval event #" + str(UUID(event["id"])),
+            },
+            headers={"Idempotency-Key": event["id"]},
+            follow_redirects=False,
+        )
+        response.raise_for_status()
+
+    return send
+
+
 def process_one(factory=SessionLocal, deliver=local_receiver, now=None, log=print):
     now = now or utcnow()
     claimed = claim(factory, now)
@@ -234,11 +257,18 @@ def main():
         signal.signal(name, lambda *_: stopped.set())
     with httpx.Client(timeout=10) as client:
         url = os.getenv("OUTBOX_WEBHOOK_URL", "")
+        topic = os.getenv("NTFY_TOPIC", "")
+        if topic and url:
+            raise ValueError("Choose ntfy or the outbox webhook")
         deliver = (
-            webhook_receiver(url, client, os.getenv("OUTBOX_WEBHOOK_TOKEN", ""))
-            if url
-            else lambda event: local_receiver(
-                event, Path(os.getenv("OUTBOX_DIRECTORY", "data/delivered-events"))
+            ntfy_receiver(topic, client)
+            if topic
+            else (
+                webhook_receiver(url, client, os.getenv("OUTBOX_WEBHOOK_TOKEN", ""))
+                if url
+                else lambda event: local_receiver(
+                    event, Path(os.getenv("OUTBOX_DIRECTORY", "data/delivered-events"))
+                )
             )
         )
         while not stopped.is_set():
