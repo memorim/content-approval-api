@@ -7,6 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from fastapi import Header, HTTPException, Path, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 @dataclass(frozen=True)
@@ -32,10 +33,21 @@ def get_principal(
         raise HTTPException(status_code=401, detail="Invalid credential")
     try:
         database = os.getenv("APP_AUTH_DATABASE")
-        if database:
+        backend = os.getenv("APP_AUTH_BACKEND", "")
+        if backend not in {"", "database"} or (backend == "database" and database):
+            raise ValueError("Choose one credential backend")
+        if backend == "database":
+            from .database import SessionLocal
+            from .sql_credentials import lookup
+
+            entry = lookup(SessionLocal, token)
+        elif database:
             from .credentials import lookup
 
             entry = lookup(database, token)
+        else:
+            entry = None
+        if backend == "database" or database:
             if entry is None:
                 raise HTTPException(
                     status_code=401, detail="Invalid or expired credential"
@@ -62,7 +74,7 @@ def get_principal(
         return Principal(
             entry["workspace_id"], entry["user_id"], frozenset(entry["actions"])
         )
-    except (ValueError, TypeError, OSError, sqlite3.Error):
+    except (ValueError, TypeError, OSError, sqlite3.Error, SQLAlchemyError):
         raise HTTPException(
             status_code=503, detail="Authentication unavailable"
         ) from None

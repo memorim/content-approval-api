@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -120,3 +120,30 @@ class OutboxEvent(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_outbox_delivery_due", "published", "dead_at", "next_attempt_at"),)
+
+
+class CredentialUser(Base):
+    __tablename__ = "credential_users"
+
+    workspace_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class CredentialToken(Base):
+    __tablename__ = "credential_tokens"
+
+    digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    actions: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "user_id"],
+            ["credential_users.workspace_id", "credential_users.user_id"],
+        ),
+        Index("ix_credential_token_user", "workspace_id", "user_id"),
+    )

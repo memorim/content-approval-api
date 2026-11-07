@@ -108,3 +108,36 @@ def test_postgres_idempotent_create_serializes_conflicting_inserts(postgres, sam
         assert db.scalar(select(func.count()).select_from(ApprovalRequest)) == 1
         assert db.scalar(select(func.count()).select_from(AuditLog)) == 1
         assert db.scalar(select(func.count()).select_from(OutboxEvent)) == 1
+
+
+def test_postgres_disabling_serializes_with_concurrent_token_issuance(postgres):
+    from app import sql_credentials as credentials
+
+    _engine, factory = postgres
+    original, _ = credentials.issue(factory, "one", "alice", ["approval:read"])
+    other, _ = credentials.issue(factory, "two", "alice", ["approval:read"])
+    gate = Barrier(2, timeout=10)
+
+    def issue():
+        gate.wait()
+        try:
+            return credentials.issue(factory, "one", "alice", ["approval:read"])[0]
+        except ValueError as error:
+            assert str(error) == "User is disabled"
+            return None
+
+    def disable():
+        gate.wait()
+        assert credentials.set_user_active(factory, "one", "alice", False) == 1
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        issued = workers.submit(issue)
+        disabled = workers.submit(disable)
+        fresh = issued.result(timeout=15)
+        disabled.result(timeout=15)
+    assert credentials.lookup(factory, original) is None
+    if fresh:
+        assert credentials.lookup(factory, fresh) is None
+    assert credentials.lookup(factory, other) is not None
+    credentials.set_user_active(factory, "one", "alice", True)
+    assert credentials.lookup(factory, original) is None

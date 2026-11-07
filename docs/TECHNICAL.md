@@ -55,6 +55,8 @@ python -m app.credentials --database "$APP_AUTH_DATABASE" issue --workspace ws_1
 
 `revoke HASH` отзывает токен, `disable-user --workspace WS --user USER` отключает пользователя и отзывает его токены в этом пространстве. Повторное включение не восстанавливает отозванные токены. Все процессы должны читать одну постоянную БД авторизации. Альтернативный `APP_AUTH_TOKENS` и порядок выбора реестра описаны в [README](../README.md#серверная-идентификация).
 
+Для PostgreSQL можно хранить этот реестр в той же постоянной базе, что и заявки: после `alembic upgrade head` задайте `APP_AUTH_BACKEND=database`, уберите `APP_AUTH_DATABASE` и замените `--database PATH` на `--application-database` в командах оператора. Новый режим не копирует старый SQLite-реестр автоматически. Подробности — в [README](../README.md#постоянные-токены-в-postgresql).
+
 Права:
 
 | Action | Для чего |

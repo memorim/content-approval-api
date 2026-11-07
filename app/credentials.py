@@ -129,7 +129,9 @@ def list_users(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database", required=True)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--database", help="Legacy local SQLite credential file")
+    target.add_argument("--application-database", action="store_true", help="Use migrated DATABASE_URL; keep its secret out of arguments")
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("issue")
     add.add_argument("--workspace", required=True)
@@ -144,18 +146,26 @@ def main():
         user.add_argument("--workspace", required=True)
         user.add_argument("--user", required=True)
     args = parser.parse_args()
+    operations = {"issue": issue, "revoke": revoke, "list_users": list_users, "set_user_active": set_user_active}
+    database = args.database
+    if args.application_database:
+        from . import sql_credentials
+        from .database import SessionLocal
+
+        database = SessionLocal
+        operations = {name: getattr(sql_credentials, name) for name in operations}
     if args.command == "issue":
-        token, digest = issue(
-            args.database, args.workspace, args.user, args.actions.split(","), args.days
+        token, digest = operations["issue"](
+            database, args.workspace, args.user, args.actions.split(","), args.days
         )
         print(json.dumps({"token": token, "token_hash": digest}))
     elif args.command == "revoke":
-        print(json.dumps({"revoked": revoke(args.database, args.hash)}))
+        print(json.dumps({"revoked": operations["revoke"](database, args.hash)}))
     elif args.command == "users":
-        print(json.dumps({"users": list_users(args.database)}))
+        print(json.dumps({"users": operations["list_users"](database)}))
     else:
-        print(json.dumps({"changed": set_user_active(
-            args.database, args.workspace, args.user, args.command == "enable-user"
+        print(json.dumps({"changed": operations["set_user_active"](
+            database, args.workspace, args.user, args.command == "enable-user"
         )}))
 
 
