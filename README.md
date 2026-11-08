@@ -71,7 +71,7 @@ CI устанавливает зависимости по зафиксирова
 
 ## Документация
 
-[Результаты аудита](docs/AUDIT_2026_10.md) · [Техническая документация](docs/TECHNICAL.md) · [Пример запроса и ответа](docs/API_EXAMPLE.md) · [Конкурентные проверки PostgreSQL](docs/POSTGRES_CONCURRENCY.md) · [История изменений](CHANGELOG.md)
+[Результаты аудита](docs/AUDIT_2026_10.md) · [Техническая документация](docs/TECHNICAL.md) · [Размещение Render](docs/DEPLOYMENT_RENDER.md) · [Пример запроса и ответа](docs/API_EXAMPLE.md) · [Конкурентные проверки PostgreSQL](docs/POSTGRES_CONCURRENCY.md) · [История изменений](CHANGELOG.md)
 
 ## Интерактивный просмотр
 
@@ -102,3 +102,9 @@ API требует `Authorization: Bearer <token>`. Заголовки X-User-Id
 Выпуск: `python -m app.credentials --application-database issue --workspace ws_1 --user owner --actions approval:read,approval:create,approval:decide,approval:cancel --days 30`. Для списка пользователей, отзыва и отключения используйте прежние подкоманды с `--application-database` вместо `--database PATH`. Адрес базы берётся из окружения, не из аргументов команды. API читает актуальное состояние при каждом запросе: отзыв действует во всех процессах без перезапуска. На PostgreSQL выпуск и отключение одного пользователя сериализованы блокировкой; повторное включение не возвращает старые токены.
 
 [Бесплатные push-уведомления через ntfy](docs/FREE_NOTIFICATIONS.md).
+
+## Размещение и снимки — 08.11.2026
+
+Запущен бесплатный Render web-сервис: https://memorim-content-approval.onrender.com/. Для постоянного реестра токенов создан бесплатный Neon PostgreSQL-проект; GitHub Actions worker по расписанию и бесплатный ntfy подготовлены без платного background worker. Секреты и строка подключения не записываются в исходники.
+
+Визуальный интерфейс не менялся; desktop/mobile снимки выше остаются актуальными и должны обновляться при следующем изменении UI.

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: content-approval-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_AUTH_BACKEND
+        value: database
+      - key: OUTBOX_WEBHOOK_URL
+        sync: false
+      - key: OUTBOX_WEBHOOK_TOKEN
+        sync: false
+      - key: NTFY_TOPIC
+        sync: false
+
+# The outbox worker runs from .github/workflows/outbox.yml on the free
+# GitHub Actions schedule. This avoids a paid Render background worker.
