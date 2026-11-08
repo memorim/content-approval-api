@@ -1,27 +1,28 @@
 # Размещение Content Approval API на Render
 
-Репозиторий содержит [Render Blueprint](../render.yaml) с двумя процессами:
+Репозиторий содержит [Render Blueprint](../render.yaml) для бесплатного web-сервиса. Он применяет Alembic-миграции перед стартом и использует PostgreSQL для заявок и постоянного реестра Bearer-токенов.
 
-- web-сервис запускает FastAPI и применяет миграции Alembic перед стартом;
-- background worker запускает `python -m app.outbox` и использует ту же PostgreSQL.
+Blueprint не создаёт базу и не содержит секретов. Укажите `DATABASE_URL` для PostgreSQL и оставьте `APP_AUTH_BACKEND=database`.
 
-Blueprint не создаёт базу и не содержит секретов. Перед запуском укажите в обоих сервисах одну и ту же `DATABASE_URL` для PostgreSQL. Для постоянного реестра доступа оставьте `APP_AUTH_BACKEND=database` и выполните миграции из web-контейнера.
+## Бесплатная доставка событий
 
-## Доставка событий
+Постоянный worker заменён бесплатным расписанием GitHub Actions в [.github/workflows/outbox.yml](../.github/workflows/outbox.yml). Workflow запускается каждые пять минут и выполняет `python -m app.outbox --once`.
 
-Выберите один канал:
+Добавьте в настройках репозитория:
 
-- `OUTBOX_WEBHOOK_URL` и `OUTBOX_WEBHOOK_TOKEN` для собственного HTTPS-получателя;
-- `NTFY_TOPIC` для бесплатных push-уведомлений.
+- `CONTENT_APPROVAL_DATABASE_URL`;
+- `CONTENT_APPROVAL_NTFY_TOPIC` для бесплатных push-уведомлений;
+- либо `CONTENT_APPROVAL_OUTBOX_WEBHOOK_URL` и `CONTENT_APPROVAL_OUTBOX_WEBHOOK_TOKEN` для собственного HTTPS-получателя.
 
-Не задавайте оба варианта одновременно. Тема ntfy должна быть случайной строкой длиной 32–128 символов. Уведомление не содержит контакты и текст заявки; получатель должен дедуплицировать `event_id`. После пяти неудачных попыток событие остаётся в очереди и возвращается вручную командой `python -m app.outbox --retry EVENT_ID`.
+Не задавайте ntfy и webhook одновременно. Тема ntfy должна быть случайной строкой длиной 32–128 символов. Уведомление не содержит контакты и текст заявки; получатель должен дедуплицировать `event_id`.
 
 ## Проверка после публикации
 
 1. Откройте HTTPS-адрес Render и убедитесь, что `/ready` отвечает успешно.
 2. Выпустите отдельные Bearer-токены для creator и reviewer через `python -m app.credentials --application-database`.
 3. Проверьте создание, approve/reject/cancel и повтор с тем же `Idempotency-Key`.
-4. Отправьте тестовую заявку и убедитесь, что запись появилась в PostgreSQL, а событие получено выбранным каналом.
-5. Повторите проверку после перезапуска web и worker.
+4. Отправьте тестовую заявку и убедитесь, что запись появилась в PostgreSQL.
+5. Дождитесь запуска workflow и проверьте, что событие доставлено выбранным каналом.
+6. Проверьте повтор после потери ответа и ручной retry dead-letter события.
 
-Render Free подходит для web-сервиса, но worker в Blueprint указан как отдельный платный background-процесс. Выберите тариф в кабинете Render самостоятельно; этот файл не запускает размещение и не меняет тариф.
+GitHub Actions и Render Free не требуют платного background worker. Секреты и PostgreSQL нужно настроить владельцу; этот репозиторий не создаёт их автоматически.
