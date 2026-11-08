@@ -71,7 +71,7 @@ CI устанавливает зависимости по зафиксирова
 
 ## Документация
 
-[Результаты аудита](docs/AUDIT_2026_10.md) · [Техническая документация](docs/TECHNICAL.md) · [Пример запроса и ответа](docs/API_EXAMPLE.md) · [Конкурентные проверки PostgreSQL](docs/POSTGRES_CONCURRENCY.md) · [История изменений](CHANGELOG.md)
+[Результаты аудита](docs/AUDIT_2026_10.md) · [Техническая документация](docs/TECHNICAL.md) · [Размещение Render](docs/DEPLOYMENT_RENDER.md) · [Пример запроса и ответа](docs/API_EXAMPLE.md) · [Конкурентные проверки PostgreSQL](docs/POSTGRES_CONCURRENCY.md) · [История изменений](CHANGELOG.md)
 
 ## Интерактивный просмотр
 
