@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: content-approval-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_AUTH_BACKEND
+        value: database
+      - key: OUTBOX_WEBHOOK_URL
+        sync: false
+      - key: OUTBOX_WEBHOOK_TOKEN
+        sync: false
+      - key: NTFY_TOPIC
+        sync: false
+
+  - type: worker
+    name: content-approval-outbox
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m app.outbox
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_AUTH_BACKEND
+        value: database
+      - key: OUTBOX_WEBHOOK_URL
+        sync: false
+      - key: OUTBOX_WEBHOOK_TOKEN
+        sync: false
+      - key: NTFY_TOPIC
+        sync: false
