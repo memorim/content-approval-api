@@ -3,12 +3,43 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 import httpx
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.models import OutboxEvent, utcnow
 from app.outbox import claim, local_receiver, process_one, webhook_receiver
+
+
+@pytest.mark.parametrize("response_status", [200, 302, 503])
+def test_one_shot_exit_matches_persisted_external_delivery(tmp_path, monkeypatch, response_status):
+    from app import outbox
+
+    engine, sessions = factory(tmp_path)
+    client_type = httpx.Client
+    monkeypatch.setenv("NTFY_TOPIC", "a" * 48)
+    monkeypatch.delenv("OUTBOX_WEBHOOK_URL", raising=False)
+    monkeypatch.setattr("sys.argv", ["outbox", "--once"])
+    monkeypatch.setattr(outbox, "process_one", lambda **kwargs: process_one(sessions, **kwargs))
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: client_type(
+        transport=httpx.MockTransport(lambda request: httpx.Response(response_status)), **kwargs
+    ))
+    try:
+        identifier = add_event(sessions)
+        if response_status == 200:
+            outbox.main()
+        else:
+            with pytest.raises(SystemExit) as result:
+                outbox.main()
+            assert result.value.code == 1
+        with sessions() as db:
+            event = db.get(OutboxEvent, identifier)
+            assert event.published == (response_status == 200)
+            assert event.attempts == 1
+            assert bool(event.next_attempt_at) == (response_status != 200)
+    finally:
+        engine.dispose()
 
 
 def factory(tmp_path):

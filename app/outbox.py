@@ -208,8 +208,13 @@ def main():
         "--once", action="store_true", help="Process up to 100 currently due events, then exit"
     )
     parser.add_argument("--status", action="store_true")
+    parser.add_argument("--require-external", action="store_true", help="Reject local delivery and missing scheduled-worker secrets")
     parser.add_argument("--retry", metavar="EVENT_ID", help="Explicitly requeue a failed event")
     args = parser.parse_args()
+    if args.require_external:
+        from app.worker_config import validate_external_delivery
+
+        validate_external_delivery()
     if args.status:
         with SessionLocal() as db:
             print(
@@ -253,6 +258,14 @@ def main():
             parser.error("Failed event not found")
         return
     stopped = threading.Event()
+    delivery_failed = False
+
+    def report_delivery(entry):
+        nonlocal delivery_failed
+        print(entry)
+        if json.loads(entry)["status"] != "delivered":
+            delivery_failed = True
+
     for name in [signal.SIGINT, signal.SIGTERM]:
         signal.signal(name, lambda *_: stopped.set())
     with httpx.Client(timeout=10) as client:
@@ -274,7 +287,7 @@ def main():
         while not stopped.is_set():
             try:
                 for _ in range(100):
-                    if stopped.is_set() or not process_one(deliver=deliver):
+                    if stopped.is_set() or not process_one(deliver=deliver, log=report_delivery):
                         break
             except Exception as error:  # noqa: BLE001 - worker boundary persists retry state without payload logs
                 print(
@@ -292,6 +305,8 @@ def main():
             if args.once:
                 break
             stopped.wait(1)
+    if args.once and delivery_failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

@@ -17,3 +17,16 @@ delay delivery; inspect the outbox and the owner workspace too. The adapter
 does not create a deployed worker, users or tokens automatically.
 
 Provider documentation: https://docs.ntfy.sh/publish/ and https://docs.ntfy.sh/privacy/.
+
+The free scheduled workflow requires `CONTENT_APPROVAL_DATABASE_URL` and exactly
+one destination: `CONTENT_APPROVAL_NTFY_TOPIC` or
+`CONTENT_APPROVAL_OUTBOX_WEBHOOK_URL` (with its optional
+`CONTENT_APPROVAL_OUTBOX_WEBHOOK_TOKEN`). It validates these before installing
+dependencies or claiming events. Missing secrets cannot silently use a local
+SQLite database or mark a temporary runner file as an external delivery.
+Migrations belong to the deployment step, not the recurring delivery job.
+Retries, rejected delivery and lost leases make the one-shot run fail while
+retaining the event in the durable queue. Runs do not overlap.
+GitHub schedules can be delayed and public-repository schedules are disabled
+after 60 days without repository activity; this is not a five-minute delivery SLA.
+Adding this workflow does not configure repository secrets or prove live delivery.

@@ -8,25 +8,27 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: outbox-delivery
+  cancel-in-progress: false
+
 jobs:
   deliver:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.CONTENT_APPROVAL_DATABASE_URL }}
+      NTFY_TOPIC: ${{ secrets.CONTENT_APPROVAL_NTFY_TOPIC }}
+      OUTBOX_WEBHOOK_URL: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_URL }}
+      OUTBOX_WEBHOOK_TOKEN: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Check persistent database and external destination
+        run: python -m app.worker_config
       - name: Install locked dependencies
         run: python -m pip install -c requirements-lock.txt -r requirements.txt
-      - name: Apply safe migrations
-        env:
-          DATABASE_URL: ${{ secrets.CONTENT_APPROVAL_DATABASE_URL }}
-        run: alembic upgrade head
       - name: Deliver due events
-        env:
-          DATABASE_URL: ${{ secrets.CONTENT_APPROVAL_DATABASE_URL }}
-          NTFY_TOPIC: ${{ secrets.CONTENT_APPROVAL_NTFY_TOPIC }}
-          OUTBOX_WEBHOOK_URL: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_URL }}
-          OUTBOX_WEBHOOK_TOKEN: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_TOKEN }}
-        run: python -m app.outbox --once
+        run: python -m app.outbox --once --require-external
