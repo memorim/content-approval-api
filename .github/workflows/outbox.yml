@@ -22,8 +22,8 @@ jobs:
       OUTBOX_WEBHOOK_URL: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_URL }}
       OUTBOX_WEBHOOK_TOKEN: ${{ secrets.CONTENT_APPROVAL_OUTBOX_WEBHOOK_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Check persistent database and external destination
